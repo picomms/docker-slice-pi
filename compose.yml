@@ -1,0 +1,40 @@
+# -----------------------------------------------
+# Cherry Pi Docker Compose File
+# -----------------------------------------------
+name: slice-pi
+
+# -----------------------------------------------
+# Networks
+# -----------------------------------------------
+networks:
+  frontend:
+    name: frontend
+  backend:
+    name: backend
+
+# -----------------------------------------------
+# Volumes
+# -----------------------------------------------
+volumes:
+
+
+# -----------------------------------------------
+# Services
+# -----------------------------------------------
+
+services:
+# ----------------- Definitions -----------------
+x-op-app-restart-policy: &app_restart_policy
+  restart: unless-stopped
+
+  speedtest-exporter:
+    <<: [*app-restart-policy]
+    image: kutovoys/speedtest-exporter:latest
+    environment:
+      - SERVER_IDS=${SPEEDTEST_EXPORTER_SERVER_IDS:-64515}
+      - UPDATE_INTERVAL=${SPEEDTEST_EXPORTER_UPDATE_INTERVAL:-10}
+      - METRICS_PROTECTED=true
+      - METRICS_USERNAME=${SPEEDTEST_EXPORTER_USERNAME:-admin}
+      - METRICS_PASSWORD=${SPEEDTEST_EXPORTER_PASSWORD:-changeme}
+    ports:
+      - "${SPEEDTEST_EXPORTER_PORT:-9090}:9090"
