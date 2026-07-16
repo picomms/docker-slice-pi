@@ -9,7 +9,7 @@ default: help
 help:
     @just --list
 
-# Start node_exporter + blackbox_exporter (Tailscale scrape path)
+# Start the endpoint stack (Agent, exporters, Speedtest)
 up:
     docker compose up -d
 

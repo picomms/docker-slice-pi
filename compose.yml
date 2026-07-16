@@ -2,7 +2,7 @@
 # NIA Monitoring — endpoint stack (Raspberry Pi)
 # Canonical template: monitoring-nia-pi/template/endpoint/
 # Deploy copy: docker-slice-pi
-# Scrapes: Tailscale → host ports 9100/9115/8765
+# Scrapes: local Prometheus Agent → Cherry remote_write over Tailscale
 # Optional: cloudflared (profile tunnel) for debug hostnames
 # -----------------------------------------------
 name: slice-pi
@@ -18,6 +18,7 @@ networks:
 # Volumes
 # -----------------------------------------------
 volumes:
+  NSD_prometheus_agent_data:
   NSD_speedtest_tracker_data:
 
 # -----------------------------------------------
@@ -30,8 +31,45 @@ x-restart: &restart_policy
 # Services
 # -----------------------------------------------
 services:
+  # -------------- prometheus-agent --------------
+  # Scrapes this stream package and remote_writes samples to Cherry.
+  prometheus:
+    <<: *restart_policy
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.13.1}
+    entrypoint:
+      - /bin/sh
+      - /etc/prometheus/render-agent-config.sh
+    environment:
+      - HOST_ID=${HOST_ID:?HOST_ID is required}
+      - WP_PRIMARY_URL=${WP_PRIMARY_URL:?WP_PRIMARY_URL is required}
+      - WP_SECONDARY_URL=${WP_SECONDARY_URL:?WP_SECONDARY_URL is required}
+      - REMOTE_WRITE_URL=${REMOTE_WRITE_URL:-http://cherry.taild08b87.ts.net:9090/api/v1/write}
+    volumes:
+      - ./prometheus/prometheus.agent.yml.tmpl:/etc/prometheus/prometheus.agent.yml.tmpl:ro
+      - ./prometheus/render-agent-config.sh:/etc/prometheus/render-agent-config.sh:ro
+      - NSD_prometheus_agent_data:/prometheus-agent
+    depends_on:
+      - node_exporter
+      - blackbox_exporter
+      - speedtest-tracker
+      - json_exporter
+    networks:
+      - frontend
+
+  # ---------------- json_exporter ---------------
+  # Converts Blackmagic Web Presenter REST JSON into Prometheus metrics.
+  json_exporter:
+    <<: *restart_policy
+    image: quay.io/prometheuscommunity/json-exporter:${JSON_EXPORTER_VERSION:-v0.7.0}
+    command:
+      - --config.file=/config.yml
+    volumes:
+      - ./json_exporter/config.yml:/config.yml:ro
+    networks:
+      - frontend
+
   # ----------------- cloudflared -----------------
-  # Optional — scrapes use Tailscale host ports, not the tunnel.
+  # Optional — scrapes use Tailscale / remote_write, not the tunnel.
   cloudflared:
     <<: *restart_policy
     profiles:
@@ -44,7 +82,7 @@ services:
       - frontend
 
   # --------------- node_exporter -----------------
-  # Published on the host for Cherry Prometheus over Tailscale.
+  # Published on the host for local debug / Tailscale checks.
   # Restrict with Tailscale ACLs / host firewall (not public internet).
   node_exporter:
     <<: *restart_policy
@@ -75,7 +113,7 @@ services:
       - frontend
 
   # -------------- speedtest-tracker --------------
-  # UI + /prometheus on :8765 for Cherry scrapes over Tailscale.
+  # UI + /prometheus on :8765; Prometheus Agent scrapes over Compose DNS.
   speedtest-tracker:
     <<: *restart_policy
     image: lscr.io/linuxserver/speedtest-tracker:${SPEEDTEST_TRACKER_VERSION:-1.14.5}

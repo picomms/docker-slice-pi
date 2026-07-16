@@ -13,12 +13,19 @@ per host.
 
 ```bash
 cp env.sample .env
-# set HOST_ID (e.g. streamrtn1) and SPEEDTEST_APP_KEY
+# set HOST_ID, SPEEDTEST_APP_KEY, WP_PRIMARY_URL, WP_SECONDARY_URL
 just up
 just ps
 ```
 
-Cherry scrapes over **Tailscale** on published ports:
+The local Prometheus Agent scrapes this Pi plus its two Web Presenters, then
+remote_writes to Cherry over **Tailscale**:
+
+```text
+http://cherry.taild08b87.ts.net:9090/api/v1/write
+```
+
+Published ports remain useful for local debug:
 
 | Port | Service |
 | --- | --- |
@@ -42,11 +49,14 @@ Restrict ports with Tailscale ACLs / host firewall. Optional tunnel: set
 curl -sS http://127.0.0.1:9100/metrics | head
 curl -sS http://127.0.0.1:9115/metrics | head
 curl -sS http://127.0.0.1:8765/prometheus | head
+just logs prometheus
 ```
 
-From Cherry (MagicDNS):
+From Cherry after remote_write:
 
 ```bash
-curl -sS "http://<HOST_ID>.taild08b87.ts.net:9100/metrics" | head
-curl -sS "http://<HOST_ID>.taild08b87.ts.net:8765/prometheus" | head
+curl --get http://localhost:9090/api/v1/query \
+  --data-urlencode 'query=up{job="node_remote",instance="<HOST_ID>"}'
+curl --get http://localhost:9090/api/v1/query \
+  --data-urlencode 'query=bmd_wp_livestream_info{instance="<HOST_ID>"}'
 ```

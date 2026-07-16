@@ -1,0 +1,81 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    monitor: slice
+    stream: @@HOST_ID@@
+
+remote_write:
+  - url: @@REMOTE_WRITE_URL@@
+
+scrape_configs:
+  - job_name: node_remote
+    static_configs:
+      - targets:
+          - node_exporter:9100
+        labels:
+          instance: @@HOST_ID@@
+
+  - job_name: blackbox
+    static_configs:
+      - targets:
+          - blackbox_exporter:9115
+        labels:
+          instance: @@HOST_ID@@
+
+  - job_name: probe_icmp
+    metrics_path: /probe
+    params:
+      module:
+        - icmp
+    static_configs:
+      - targets:
+          - 1.1.1.1
+        labels:
+          instance: @@HOST_ID@@
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: probe_target
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
+  - job_name: speedtest_remote
+    scrape_interval: 60s
+    scrape_timeout: 10s
+    metrics_path: /prometheus
+    static_configs:
+      - targets:
+          - speedtest-tracker:80
+        labels:
+          instance: @@HOST_ID@@
+
+  - job_name: bmd_web_presenter
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /probe
+    params:
+      module:
+        - web_presenter
+    static_configs:
+      - targets:
+          - @@WP_PRIMARY_URL@@/control/api/v1/livestreams/0
+        labels:
+          instance: @@HOST_ID@@
+          presenter: primary
+          role: primary
+      - targets:
+          - @@WP_SECONDARY_URL@@/control/api/v1/livestreams/0
+        labels:
+          instance: @@HOST_ID@@
+          presenter: secondary
+          role: secondary
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: wp_target
+      - target_label: __address__
+        replacement: json_exporter:7979

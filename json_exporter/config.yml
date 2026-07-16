@@ -1,0 +1,27 @@
+modules:
+  web_presenter:
+    metrics:
+      - name: bmd_wp_bitrate_bps
+        path: '{ .bitrate }'
+        help: Blackmagic Web Presenter livestream bitrate in bits per second.
+        value_type: gauge
+
+      - name: bmd_wp_duration_seconds
+        path: '{ .duration }'
+        help: Blackmagic Web Presenter livestream duration in seconds.
+        value_type: gauge
+
+      - name: bmd_wp_cache_percent
+        path: '{ .cache }'
+        help: Blackmagic Web Presenter livestream cache usage percentage.
+        value_type: gauge
+
+      - name: bmd_wp_livestream
+        type: object
+        path: '{ . }'
+        help: Blackmagic Web Presenter livestream state labels.
+        labels:
+          status: '{ .status }'
+          effective_video_format: '{ .effectiveVideoFormat }'
+        values:
+          info: 1
